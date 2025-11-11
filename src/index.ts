@@ -10,30 +10,90 @@ import {
 import { KitAPIClient } from "./kit-api.js";
 import { PermissionsManager } from "./permissions.js";
 import { ApprovalQueue } from "./approval-queue.js";
+import { LocalDraftManager } from "./local-drafts.js";
 
 // Environment variables
 const KIT_API_KEY = process.env.KIT_API_KEY;
 const KIT_API_SECRET = process.env.KIT_API_SECRET;
+const DRAFTS_PATH = process.env.DRAFTS_PATH || "/Users/ohad/Content/eMail";
 
 if (!KIT_API_KEY || !KIT_API_SECRET) {
   console.error("Error: KIT_API_KEY and KIT_API_SECRET environment variables are required");
   process.exit(1);
 }
 
-// Initialize Kit API client, permissions manager, and approval queue
+// Initialize Kit API client, permissions manager, approval queue, and local drafts
 const kitClient = new KitAPIClient(KIT_API_KEY, KIT_API_SECRET);
 const permissions = new PermissionsManager();
 const approvalQueue = new ApprovalQueue();
+const draftManager = new LocalDraftManager(DRAFTS_PATH);
 
 // Clean up old approvals every hour
 setInterval(() => approvalQueue.cleanup(), 60 * 60 * 1000);
 
 // Define available tools
 const tools: Tool[] = [
+  // Local draft management (NO APPROVAL NEEDED - just saves to disk)
+  {
+    name: "create_local_draft",
+    description: "Create a new email draft in your local Content/eMail folder for review and editing. NO APPROVAL NEEDED - just saves a .md file locally.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        subject: { type: "string", description: "Email subject line" },
+        content: { type: "string", description: "Email body content" },
+        description: { type: "string", description: "Internal description" },
+        send_at: { type: "string", description: "ISO 8601 datetime to schedule (optional)" },
+      },
+      required: ["subject", "content"],
+    },
+  },
+  {
+    name: "list_local_drafts",
+    description: "List all local email drafts in Content/eMail folder",
+    inputSchema: {
+      type: "object",
+      properties: {},
+    },
+  },
+  {
+    name: "read_local_draft",
+    description: "Read a local draft by its draft_id",
+    inputSchema: {
+      type: "object",
+      properties: {
+        draft_id: { type: "string", description: "The draft ID to read" },
+      },
+      required: ["draft_id"],
+    },
+  },
+  {
+    name: "publish_local_draft_to_kit",
+    description: "Publish a local draft to Kit. THIS REQUIRES USER APPROVAL. Reads the local .md file and sends it to Kit API.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        draft_id: { type: "string", description: "The local draft ID to publish" },
+      },
+      required: ["draft_id"],
+    },
+  },
+  {
+    name: "delete_local_draft",
+    description: "Delete a local draft file",
+    inputSchema: {
+      type: "object",
+      properties: {
+        draft_id: { type: "string", description: "The draft ID to delete" },
+      },
+      required: ["draft_id"],
+    },
+  },
+
   // Write operations that require approval
   {
     name: "create_broadcast",
-    description: "Request to create a new email broadcast. THIS REQUIRES USER APPROVAL. Will show preview and wait for confirmation.",
+    description: "DEPRECATED: Use create_local_draft instead. Direct creation to Kit requires approval.",
     inputSchema: {
       type: "object",
       properties: {
@@ -181,6 +241,113 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
   const { name, arguments: args } = request.params;
 
   try {
+    // Local draft management tools (no approval needed - just file operations)
+    if (name === "create_local_draft") {
+      const { draft_id, file_path } = draftManager.createDraft(args as any);
+      return {
+        content: [{
+          type: "text",
+          text: `✅ LOCAL DRAFT CREATED\n\nDraft ID: ${draft_id}\nFile: ${file_path}\n\nThe draft has been saved locally. You can now:\n1. Open the file to review/edit it\n2. Use read_local_draft to view it\n3. Use publish_local_draft_to_kit when ready to send to Kit`,
+        }],
+      };
+    }
+
+    if (name === "list_local_drafts") {
+      const drafts = draftManager.listDrafts();
+      if (drafts.length === 0) {
+        return {
+          content: [{
+            type: "text",
+            text: "No local drafts found in Content/eMail folder.",
+          }],
+        };
+      }
+
+      const list = drafts.map(d =>
+        `━━━━━━━━━━━━━━━━━━━━━━━━\nDraft ID: ${d.draft_id}\nSubject: ${d.subject}\nStatus: ${d.status}\nCreated: ${new Date(d.created_at).toLocaleString()}\nFile: ${d.file_path}\n`
+      ).join('\n');
+
+      return {
+        content: [{
+          type: "text",
+          text: `LOCAL DRAFTS:\n\n${list}`,
+        }],
+      };
+    }
+
+    if (name === "read_local_draft") {
+      const draft = draftManager.readDraft((args as any).draft_id);
+      if (!draft) {
+        return {
+          content: [{
+            type: "text",
+            text: `❌ Draft not found: ${(args as any).draft_id}`,
+          }],
+          isError: true,
+        };
+      }
+
+      return {
+        content: [{
+          type: "text",
+          text: `📧 LOCAL DRAFT\n\nSubject: ${draft.metadata.subject}\nStatus: ${draft.metadata.status}\nCreated: ${draft.metadata.created_at}\n${draft.metadata.send_at ? `Scheduled for: ${draft.metadata.send_at}\n` : ''}\n━━━━━━━━━━━━━━━━━━━━━━━━\n\n${draft.content}\n\n━━━━━━━━━━━━━━━━━━━━━━━━\nFile: ${draft.file_path}`,
+        }],
+      };
+    }
+
+    if (name === "delete_local_draft") {
+      const deleted = draftManager.deleteDraft((args as any).draft_id);
+      if (!deleted) {
+        return {
+          content: [{
+            type: "text",
+            text: `❌ Draft not found: ${(args as any).draft_id}`,
+          }],
+          isError: true,
+        };
+      }
+
+      return {
+        content: [{
+          type: "text",
+          text: `✅ Local draft deleted: ${(args as any).draft_id}`,
+        }],
+      };
+    }
+
+    if (name === "publish_local_draft_to_kit") {
+      const draft = draftManager.readDraft((args as any).draft_id);
+      if (!draft) {
+        return {
+          content: [{
+            type: "text",
+            text: `❌ Draft not found: ${(args as any).draft_id}`,
+          }],
+          isError: true,
+        };
+      }
+
+      // This requires approval, so add to approval queue
+      const broadcastData = {
+        subject: draft.metadata.subject,
+        content: draft.content,
+        description: draft.metadata.description,
+        send_at: draft.metadata.send_at,
+        published: draft.metadata.published,
+        email_layout_template: draft.metadata.email_layout_template,
+      };
+
+      const summary = permissions.formatApprovalRequest("create_broadcast", broadcastData);
+      const approvalId = approvalQueue.add("create_broadcast", broadcastData, summary);
+
+      return {
+        content: [{
+          type: "text",
+          text: `${summary}\n\n📁 Publishing from local draft: ${draft.metadata.subject}\n🔑 Approval ID: ${approvalId}\n\nTo proceed, approve this operation.`,
+        }],
+      };
+    }
+
     // Approval management tools
     if (name === "approve_operation") {
       const approvalId = (args as any).approval_id;

@@ -1,12 +1,24 @@
 # Kit MCP Server
 
-A **secure** Model Context Protocol (MCP) server for [Kit.com](https://kit.com) (formerly ConvertKit) that enables AI assistants like Claude to create and manage email broadcasts, subscribers, and tags.
+A **secure, local-first** Model Context Protocol (MCP) server for [Kit.com](https://kit.com) (formerly ConvertKit) that enables AI assistants like Claude to create and manage email broadcasts, subscribers, and tags.
+
+## 📝 Local-First Workflow
+
+**All email drafts are created, edited, and reviewed locally before sending to Kit.**
+
+1. **Create Local** - Claude saves draft as .md file in your Content/eMail folder
+2. **Review & Edit** - Open file, make changes, save (no approval needed)
+3. **Approve** - Tell Claude to publish when ready
+4. **Send to Kit** - After your approval, broadcast created in Kit
+
+See [LOCAL-DRAFTS.md](LOCAL-DRAFTS.md) for complete workflow documentation.
 
 ## 🔒 Security First
 
 **All write operations require explicit user approval** - nothing happens without your confirmation.
 
-- ✅ Preview every action before it executes
+- ✅ Drafts created locally first (instant, no approval)
+- ✅ Edit and review before anything goes to Kit
 - ✅ Approve or deny each operation individually
 - ✅ Read-only operations work instantly (viewing data)
 - ✅ Local-only - runs entirely on your machine
