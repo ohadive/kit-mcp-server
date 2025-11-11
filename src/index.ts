@@ -8,6 +8,8 @@ import {
   Tool,
 } from "@modelcontextprotocol/sdk/types.js";
 import { KitAPIClient } from "./kit-api.js";
+import { PermissionsManager } from "./permissions.js";
+import { ApprovalQueue } from "./approval-queue.js";
 
 // Environment variables
 const KIT_API_KEY = process.env.KIT_API_KEY;
@@ -18,154 +20,140 @@ if (!KIT_API_KEY || !KIT_API_SECRET) {
   process.exit(1);
 }
 
-// Initialize Kit API client
+// Initialize Kit API client, permissions manager, and approval queue
 const kitClient = new KitAPIClient(KIT_API_KEY, KIT_API_SECRET);
+const permissions = new PermissionsManager();
+const approvalQueue = new ApprovalQueue();
+
+// Clean up old approvals every hour
+setInterval(() => approvalQueue.cleanup(), 60 * 60 * 1000);
 
 // Define available tools
 const tools: Tool[] = [
+  // Write operations that require approval
   {
     name: "create_broadcast",
-    description: "Create a new email broadcast (draft or scheduled). Can include subject line, content, and optional scheduling.",
+    description: "Request to create a new email broadcast. THIS REQUIRES USER APPROVAL. Will show preview and wait for confirmation.",
     inputSchema: {
       type: "object",
       properties: {
-        subject: {
-          type: "string",
-          description: "Email subject line",
-        },
-        content: {
-          type: "string",
-          description: "Email body content (HTML or plain text)",
-        },
-        description: {
-          type: "string",
-          description: "Internal description for the broadcast",
-        },
-        email_layout_template: {
-          type: "string",
-          description: "Template ID to use (optional)",
-        },
-        published: {
-          type: "boolean",
-          description: "Whether to publish immediately (true) or save as draft (false). Default: false",
-        },
-        send_at: {
-          type: "string",
-          description: "ISO 8601 datetime to schedule the broadcast (e.g., '2025-11-15T09:00:00Z'). Leave empty for draft.",
-        },
+        subject: { type: "string", description: "Email subject line" },
+        content: { type: "string", description: "Email body content" },
+        description: { type: "string", description: "Internal description" },
+        published: { type: "boolean", description: "Publish immediately (default: false)" },
+        send_at: { type: "string", description: "ISO 8601 datetime to schedule" },
       },
       required: ["subject", "content"],
     },
   },
   {
-    name: "list_broadcasts",
-    description: "List recent email broadcasts with their status",
-    inputSchema: {
-      type: "object",
-      properties: {
-        limit: {
-          type: "number",
-          description: "Number of broadcasts to return (default: 10, max: 50)",
-        },
-      },
-    },
-  },
-  {
-    name: "get_broadcast",
-    description: "Get details of a specific broadcast by ID",
-    inputSchema: {
-      type: "object",
-      properties: {
-        broadcast_id: {
-          type: "string",
-          description: "The broadcast ID",
-        },
-      },
-      required: ["broadcast_id"],
-    },
-  },
-  {
     name: "add_subscriber",
-    description: "Add a new subscriber or update an existing one",
+    description: "Request to add a new subscriber. THIS REQUIRES USER APPROVAL.",
     inputSchema: {
       type: "object",
       properties: {
-        email: {
-          type: "string",
-          description: "Subscriber email address",
-        },
-        first_name: {
-          type: "string",
-          description: "Subscriber first name",
-        },
-        tags: {
-          type: "array",
-          items: { type: "string" },
-          description: "Array of tag names to apply",
-        },
-        fields: {
-          type: "object",
-          description: "Custom fields as key-value pairs",
-        },
+        email: { type: "string", description: "Subscriber email" },
+        first_name: { type: "string", description: "First name" },
+        tags: { type: "array", items: { type: "string" }, description: "Tags to apply" },
       },
       required: ["email"],
     },
   },
   {
-    name: "list_subscribers",
-    description: "List subscribers with optional filtering",
-    inputSchema: {
-      type: "object",
-      properties: {
-        tag_name: {
-          type: "string",
-          description: "Filter by tag name",
-        },
-        limit: {
-          type: "number",
-          description: "Number of subscribers to return (default: 10, max: 50)",
-        },
-      },
-    },
-  },
-  {
     name: "create_tag",
-    description: "Create a new tag",
+    description: "Request to create a new tag. THIS REQUIRES USER APPROVAL.",
     inputSchema: {
       type: "object",
       properties: {
-        name: {
-          type: "string",
-          description: "Tag name",
-        },
+        name: { type: "string", description: "Tag name" },
       },
       required: ["name"],
     },
   },
   {
-    name: "list_tags",
-    description: "List all tags",
+    name: "tag_subscriber",
+    description: "Request to add a tag to a subscriber. THIS REQUIRES USER APPROVAL.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        email: { type: "string", description: "Subscriber email" },
+        tag_name: { type: "string", description: "Tag name" },
+      },
+      required: ["email", "tag_name"],
+    },
+  },
+
+  // Approval management tools
+  {
+    name: "approve_operation",
+    description: "Approve a pending operation by its approval ID",
+    inputSchema: {
+      type: "object",
+      properties: {
+        approval_id: { type: "string", description: "The approval ID to execute" },
+      },
+      required: ["approval_id"],
+    },
+  },
+  {
+    name: "list_pending_approvals",
+    description: "List all pending operations awaiting approval",
     inputSchema: {
       type: "object",
       properties: {},
     },
   },
   {
-    name: "tag_subscriber",
-    description: "Add a tag to a subscriber",
+    name: "cancel_approval",
+    description: "Cancel/deny a pending approval",
     inputSchema: {
       type: "object",
       properties: {
-        email: {
-          type: "string",
-          description: "Subscriber email address",
-        },
-        tag_name: {
-          type: "string",
-          description: "Tag name to apply",
-        },
+        approval_id: { type: "string", description: "The approval ID to cancel" },
       },
-      required: ["email", "tag_name"],
+      required: ["approval_id"],
+    },
+  },
+
+  // Read-only operations (no approval needed)
+  {
+    name: "list_broadcasts",
+    description: "List recent email broadcasts (READ-ONLY, no approval needed)",
+    inputSchema: {
+      type: "object",
+      properties: {
+        limit: { type: "number", description: "Number to return (default: 10)" },
+      },
+    },
+  },
+  {
+    name: "get_broadcast",
+    description: "Get details of a specific broadcast (READ-ONLY)",
+    inputSchema: {
+      type: "object",
+      properties: {
+        broadcast_id: { type: "string", description: "Broadcast ID" },
+      },
+      required: ["broadcast_id"],
+    },
+  },
+  {
+    name: "list_subscribers",
+    description: "List subscribers (READ-ONLY)",
+    inputSchema: {
+      type: "object",
+      properties: {
+        tag_name: { type: "string", description: "Filter by tag" },
+        limit: { type: "number", description: "Number to return (default: 10)" },
+      },
+    },
+  },
+  {
+    name: "list_tags",
+    description: "List all tags (READ-ONLY)",
+    inputSchema: {
+      type: "object",
+      properties: {},
     },
   },
 ];
@@ -174,7 +162,7 @@ const tools: Tool[] = [
 const server = new Server(
   {
     name: "kit-mcp-server",
-    version: "0.1.0",
+    version: "0.2.0",
   },
   {
     capabilities: {
@@ -193,53 +181,130 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
   const { name, arguments: args } = request.params;
 
   try {
-    switch (name) {
-      case "create_broadcast": {
-        const result = await kitClient.createBroadcast(args as any);
+    // Approval management tools
+    if (name === "approve_operation") {
+      const approvalId = (args as any).approval_id;
+      const pending = approvalQueue.get(approvalId);
+
+      if (!pending) {
         return {
-          content: [
-            {
-              type: "text",
-              text: JSON.stringify(result, null, 2),
-            },
-          ],
+          content: [{
+            type: "text",
+            text: `❌ Approval ID "${approvalId}" not found or already expired.`,
+          }],
+          isError: true,
         };
       }
 
+      // Execute the approved operation
+      let result;
+      switch (pending.operation) {
+        case "create_broadcast":
+          result = await kitClient.createBroadcast(pending.args);
+          break;
+        case "add_subscriber":
+          result = await kitClient.addSubscriber(pending.args);
+          break;
+        case "create_tag":
+          result = await kitClient.createTag(pending.args.name);
+          break;
+        case "tag_subscriber":
+          result = await kitClient.tagSubscriber(pending.args.email, pending.args.tag_name);
+          break;
+        default:
+          throw new Error(`Unknown operation: ${pending.operation}`);
+      }
+
+      // Remove from queue
+      approvalQueue.remove(approvalId);
+
+      return {
+        content: [{
+          type: "text",
+          text: `✅ OPERATION APPROVED AND EXECUTED\n\nOperation: ${pending.operation}\nApproval ID: ${approvalId}\n\nResult:\n${JSON.stringify(result, null, 2)}`,
+        }],
+      };
+    }
+
+    if (name === "list_pending_approvals") {
+      const pending = approvalQueue.list();
+      if (pending.length === 0) {
+        return {
+          content: [{
+            type: "text",
+            text: "No pending approvals.",
+          }],
+        };
+      }
+
+      const list = pending.map(p =>
+        `━━━━━━━━━━━━━━━━━━━━━━━━\nID: ${p.id}\n${p.summary}\nRequested: ${new Date(p.timestamp).toLocaleString()}\n`
+      ).join('\n');
+
+      return {
+        content: [{
+          type: "text",
+          text: `PENDING APPROVALS:\n\n${list}`,
+        }],
+      };
+    }
+
+    if (name === "cancel_approval") {
+      const approvalId = (args as any).approval_id;
+      const pending = approvalQueue.get(approvalId);
+
+      if (!pending) {
+        return {
+          content: [{
+            type: "text",
+            text: `❌ Approval ID "${approvalId}" not found.`,
+          }],
+          isError: true,
+        };
+      }
+
+      approvalQueue.remove(approvalId);
+      return {
+        content: [{
+          type: "text",
+          text: `✅ Approval "${approvalId}" has been cancelled.`,
+        }],
+      };
+    }
+
+    // Write operations that require approval
+    if (permissions.requiresApproval(name)) {
+      const summary = permissions.formatApprovalRequest(name, args);
+      const approvalId = approvalQueue.add(name, args, summary);
+
+      return {
+        content: [{
+          type: "text",
+          text: `${summary}\n\n🔑 Approval ID: ${approvalId}\n\nTo proceed, the user must explicitly approve this operation using:\napprove_operation with approval_id: ${approvalId}`,
+        }],
+      };
+    }
+
+    // Read-only operations (execute immediately)
+    switch (name) {
       case "list_broadcasts": {
         const limit = (args?.limit as number) || 10;
         const result = await kitClient.listBroadcasts(limit);
         return {
-          content: [
-            {
-              type: "text",
-              text: JSON.stringify(result, null, 2),
-            },
-          ],
+          content: [{
+            type: "text",
+            text: JSON.stringify(result, null, 2),
+          }],
         };
       }
 
       case "get_broadcast": {
         const result = await kitClient.getBroadcast((args as any).broadcast_id);
         return {
-          content: [
-            {
-              type: "text",
-              text: JSON.stringify(result, null, 2),
-            },
-          ],
-        };
-      }
-
-      case "add_subscriber": {
-        const result = await kitClient.addSubscriber(args as any);
-        return {
-          content: [
-            {
-              type: "text",
-              text: JSON.stringify(result, null, 2),
-            },
-          ],
+          content: [{
+            type: "text",
+            text: JSON.stringify(result, null, 2),
+          }],
         };
       }
 
@@ -248,48 +313,20 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         const tagName = args?.tag_name as string | undefined;
         const result = await kitClient.listSubscribers(tagName, limit);
         return {
-          content: [
-            {
-              type: "text",
-              text: JSON.stringify(result, null, 2),
-            },
-          ],
-        };
-      }
-
-      case "create_tag": {
-        const result = await kitClient.createTag((args as any).name);
-        return {
-          content: [
-            {
-              type: "text",
-              text: JSON.stringify(result, null, 2),
-            },
-          ],
+          content: [{
+            type: "text",
+            text: JSON.stringify(result, null, 2),
+          }],
         };
       }
 
       case "list_tags": {
         const result = await kitClient.listTags();
         return {
-          content: [
-            {
-              type: "text",
-              text: JSON.stringify(result, null, 2),
-            },
-          ],
-        };
-      }
-
-      case "tag_subscriber": {
-        const result = await kitClient.tagSubscriber((args as any).email, (args as any).tag_name);
-        return {
-          content: [
-            {
-              type: "text",
-              text: JSON.stringify(result, null, 2),
-            },
-          ],
+          content: [{
+            type: "text",
+            text: JSON.stringify(result, null, 2),
+          }],
         };
       }
 
@@ -299,12 +336,10 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error);
     return {
-      content: [
-        {
-          type: "text",
-          text: `Error: ${errorMessage}`,
-        },
-      ],
+      content: [{
+        type: "text",
+        text: `Error: ${errorMessage}`,
+      }],
       isError: true,
     };
   }
@@ -314,7 +349,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 async function main() {
   const transport = new StdioServerTransport();
   await server.connect(transport);
-  console.error("Kit MCP Server running on stdio");
+  console.error("Kit MCP Server v0.2.0 (with approval system) running on stdio");
 }
 
 main().catch((error) => {

@@ -1,14 +1,26 @@
 # Kit MCP Server
 
-A Model Context Protocol (MCP) server for [Kit.com](https://kit.com) (formerly ConvertKit) that enables AI assistants like Claude to create and manage email broadcasts, subscribers, and tags.
+A **secure** Model Context Protocol (MCP) server for [Kit.com](https://kit.com) (formerly ConvertKit) that enables AI assistants like Claude to create and manage email broadcasts, subscribers, and tags.
+
+## 🔒 Security First
+
+**All write operations require explicit user approval** - nothing happens without your confirmation.
+
+- ✅ Preview every action before it executes
+- ✅ Approve or deny each operation individually
+- ✅ Read-only operations work instantly (viewing data)
+- ✅ Local-only - runs entirely on your machine
+- ✅ Your API keys never leave your computer
+
+See [SECURITY.md](SECURITY.md) for complete security documentation.
 
 ## Features
 
-- 📧 **Create Email Broadcasts** - Draft and create email broadcasts directly from conversations
-- 📅 **Schedule Emails** - Schedule broadcasts for future delivery
-- 👥 **Manage Subscribers** - Add, update, and tag subscribers
-- 🏷️ **Tag Management** - Create and apply tags to organize your list
-- 🎯 **Segment Lists** - Query subscribers by tags and segments
+- 📧 **Create Email Broadcasts** - Draft and create email broadcasts (with approval)
+- 📅 **Schedule Emails** - Schedule broadcasts for future delivery (with approval)
+- 👥 **Manage Subscribers** - Add, update, and tag subscribers (with approval)
+- 🏷️ **Tag Management** - Create and apply tags (with approval)
+- 🎯 **View Data** - List broadcasts, subscribers, and tags (instant, no approval needed)
 
 ## Installation
 
@@ -53,11 +65,44 @@ Add this configuration:
 
 Once configured, you can interact with Kit through natural language in Claude:
 
-**Examples:**
-- "Create a draft email about symptoms vs root causes in app marketing"
-- "Schedule this email for next Tuesday at 9am"
-- "Add the tag 'shopify-founders' to subscribers who opened my last 3 emails"
-- "Show me how many subscribers have the 'engaged' tag"
+### Read Operations (Instant, No Approval)
+- "List my recent broadcasts"
+- "Show me all subscribers with the 'shopify-founders' tag"
+- "List all my tags"
+
+### Write Operations (Require Approval)
+- "Create a draft email about symptoms vs root causes"
+  - Claude will show you the preview
+  - You say "yes, go ahead" or "approve"
+  - Claude executes the approved operation
+
+- "Add john@example.com to my list"
+  - Preview shown
+  - You approve
+  - Subscriber added
+
+### How Approval Works
+
+1. You ask Claude to do something (e.g., create an email)
+2. Claude shows you exactly what will happen
+3. You explicitly approve or deny
+4. Only then does it execute
+
+**Example:**
+```
+You: "Create a draft email with subject 'Test' and content 'Hello World'"
+
+Claude: "I've prepared this email broadcast:
+- Subject: Test
+- Content: Hello World
+- Status: Draft (not sent)
+
+Should I proceed with creating this draft?"
+
+You: "Yes"
+
+Claude: ✅ Draft created successfully!
+```
 
 ## Development
 

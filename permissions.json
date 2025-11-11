@@ -1,0 +1,18 @@
+{
+  "read_operations": [
+    "list_broadcasts",
+    "get_broadcast",
+    "list_subscribers",
+    "list_tags"
+  ],
+  "write_operations_require_approval": [
+    "create_broadcast",
+    "add_subscriber",
+    "create_tag",
+    "tag_subscriber"
+  ],
+  "forbidden_operations": [
+    "delete_broadcast",
+    "unsubscribe"
+  ]
+}
