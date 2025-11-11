@@ -14,11 +14,11 @@ import { LocalDraftManager } from "./local-drafts.js";
 
 // Environment variables
 const KIT_API_KEY = process.env.KIT_API_KEY;
-const KIT_API_SECRET = process.env.KIT_API_SECRET;
+const KIT_API_SECRET = process.env.KIT_API_SECRET || ""; // Optional - only needed for webhooks
 const DRAFTS_PATH = process.env.DRAFTS_PATH || "/Users/ohad/Content/eMail";
 
-if (!KIT_API_KEY || !KIT_API_SECRET) {
-  console.error("Error: KIT_API_KEY and KIT_API_SECRET environment variables are required");
+if (!KIT_API_KEY) {
+  console.error("Error: KIT_API_KEY environment variable is required");
   process.exit(1);
 }
 
