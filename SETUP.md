@@ -20,7 +20,7 @@ This guide will walk you through setting up the Kit MCP Server with Claude Deskt
 
 ```bash
 # Clone the repository
-git clone https://github.com/ohadive/kit-mcp-server.git
+git clone https://github.com/YOUR_USERNAME/kit-mcp-server.git
 cd kit-mcp-server
 
 # Install dependencies
@@ -71,10 +71,11 @@ Add this to your config file (replace `/path/to/kit-mcp-server` with your actual
   "mcpServers": {
     "kit": {
       "command": "node",
-      "args": ["/Users/ohad/kit-mcp-server/dist/index.js"],
+      "args": ["/Users/YOUR_USERNAME/kit-mcp-server/dist/index.js"],
       "env": {
         "KIT_API_KEY": "12345_abcdefgh",
-        "KIT_API_SECRET": "your-secret-key-here"
+        "KIT_API_SECRET": "your-secret-key-here",
+        "DRAFTS_PATH": "/Users/YOUR_USERNAME/Content/eMail"
       }
     }
   }

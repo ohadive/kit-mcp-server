@@ -1,0 +1,5 @@
+# This directory is for local email drafts
+
+Email drafts created by the Kit MCP Server will be stored here as markdown files.
+
+You can customize the drafts directory location by setting the DRAFTS_PATH environment variable.

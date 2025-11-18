@@ -6,7 +6,7 @@ A **secure, local-first** Model Context Protocol (MCP) server for [Kit.com](http
 
 **All email drafts are created, edited, and reviewed locally before sending to Kit.**
 
-1. **Create Local** - Claude saves draft as .md file in your Content/eMail folder
+1. **Create Local** - Claude saves draft as .md file in your drafts folder
 2. **Review & Edit** - Open file, make changes, save (no approval needed)
 3. **Approve** - Tell Claude to publish when ready
 4. **Send to Kit** - After your approval, broadcast created in Kit
@@ -142,6 +142,6 @@ This server uses the [Kit API v4](https://developers.kit.com/). Key endpoints:
 
 MIT
 
-## Author
+## Credits
 
-Ohad Michaeli - [https://github.com/ohadive](https://github.com/ohadive)
+Originally created by Ohad Michaeli

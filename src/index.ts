@@ -15,7 +15,7 @@ import { LocalDraftManager } from "./local-drafts.js";
 // Environment variables
 const KIT_API_KEY = process.env.KIT_API_KEY;
 const KIT_API_SECRET = process.env.KIT_API_SECRET || ""; // Optional - only needed for webhooks
-const DRAFTS_PATH = process.env.DRAFTS_PATH || "/Users/ohad/Content/eMail";
+const DRAFTS_PATH = process.env.DRAFTS_PATH || "./drafts";
 
 if (!KIT_API_KEY) {
   console.error("Error: KIT_API_KEY environment variable is required");
