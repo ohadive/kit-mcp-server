@@ -21,7 +21,7 @@ interface DraftMetadata {
 export class LocalDraftManager {
   private draftsPath: string;
 
-  constructor(draftsPath: string = '/Users/ohad/Content/eMail') {
+  constructor(draftsPath: string = './drafts') {
     this.draftsPath = draftsPath;
 
     // Ensure the directory exists

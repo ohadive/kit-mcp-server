@@ -21,7 +21,7 @@ The Kit MCP Server now supports a **local-first workflow** where all email draft
 
 **You:** "Create a draft email about symptoms vs root causes"
 
-**Claude:** Creates a .md file in `/Users/ohad/Content/eMail/`
+**Claude:** Creates a .md file in your configured drafts folder (default: `./drafts/`)
 - Filename: `2025-11-11_symptoms-vs-root-causes_1234567.md`
 - Status: `draft`
 - NO approval needed - just saves locally
@@ -185,7 +185,7 @@ You: "Create a local draft email with subject 'Test' and content 'Hello World'"
 Claude: ✅ LOCAL DRAFT CREATED
 
 Draft ID: draft_1731349800_abc123
-File: /Users/ohad/Content/eMail/2025-11-11_test_1731349800.md
+File: ./drafts/2025-11-11_test_1731349800.md
 
 You can now:
 1. Open the file to review/edit it
@@ -207,7 +207,7 @@ Draft ID: draft_1731349800_abc123
 Subject: Test
 Status: draft
 Created: 11/11/2025, 6:30:00 PM
-File: /Users/ohad/Content/eMail/2025-11-11_test_1731349800.md
+File: ./drafts/2025-11-11_test_1731349800.md
 
 ---
 

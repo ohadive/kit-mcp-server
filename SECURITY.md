@@ -152,4 +152,4 @@ Check your Kit account regularly:
 ## Questions?
 
 If you have security concerns or questions, please open an issue on GitHub:
-https://github.com/ohadive/kit-mcp-server/issues
+https://github.com/YOUR_USERNAME/kit-mcp-server/issues
